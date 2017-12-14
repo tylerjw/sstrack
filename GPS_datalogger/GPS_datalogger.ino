@@ -17,6 +17,9 @@ Adafruit_GPS GPS(&GPSSerial);
 //uint32_t timer = millis();
 
 #define PMTK_SET_NMEA_OUTPUT_RMCGGA5 "$PMTK314,0,1,0,5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*2C"
+#define PMTK_Q_NAV_THRESHOLD "$PMTK447*35"
+#define PMTK_SET_NAV_SPEED_1MS "$PMTK386,1.0*3C"
+#define PMTK_SET_NAV_SPEED_2MS "$PMTK386,2.0*3F"
 
 const int chipSelect = 4;
 bool fileOpen = false;
@@ -50,10 +53,16 @@ void setup()
   GPS.sendCommand(PMTK_SET_NMEA_UPDATE_5HZ);
   
   // RMC every fix, GGA every 5 fixes
-  GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA5);
+//  GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA5);
+
+  // RMC only
+  GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCONLY);
      
   // Request updates on antenna status, comment out to keep quiet
   GPS.sendCommand(PGCMD_NOANTENNA);
+
+  // set the nav threshold to 1ms so the gps won't generate new points if the speed is low
+  GPS.sendCommand(PMTK_SET_NAV_SPEED_1MS);
 
   delay(1000);
 
