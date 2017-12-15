@@ -6,18 +6,19 @@ from geo.sphere import bearing
 import matplotlib.pyplot as plt
 from math import cos,sin,radians
 
-def unwrap_angles(angles):
-  adjustment = 0
-  threshold = 180
-  for i in range(1,len(angles)):
-    angles[i] += adjustment
-    if (angles[i] - angles[i-1] > threshold):
-      adjustment -= 360
-      angles[i] += adjustment
-    elif (angles[i] - angles[i-1] < -1*threshold):
-      adjustment += 360
-      angles[i] += adjustment
+def calculate_delta(vector, offset=1):
+  return [b-a for a,b in zip(vector[:-offset], vector[offset:])] + [0]*(offset-1)
 
+def upwrap_angles(angles, threshold=180):
+  offset = 0
+  for i in range(1, len(angles)):
+    angles[i] += offset
+    if (angles[i] - angles[i-1] > threshold):
+      offset -= 360
+      angles[i] += offset
+    elif (angles[i-1] - angles[i] > threshold):
+      offset += 360
+      angles[i] += offset
   return angles
 
 def main():
@@ -58,33 +59,28 @@ def main():
   speeds = []
   points = [(0,0)]
   a = gps_msgs[0]
-
   for b in gps_msgs[1:]:
     if (b.spd_over_grnd < 1):
       continue
 
-    x = (a.latitude,a.longitude)
-    y = (b.latitude,b.longitude)
-
+    x = (a.latitude, a.longitude)
+    y = (b.latitude, b.longitude)
     r = distance(x,y)
     q = bearing(x,y)
 
-    speeds.append(b.spd_over_grnd)
-    courses.append(b.true_course)
+    speeds.append(a.spd_over_grnd)
     distances.append(r)
-    bearings.append(q)
+    bearings.append(r)
+    courses.append(a.true_course)
     start = points[-1]
-    end = (start[0]+r*cos(radians(q)),
-           start[1]-r*sin(radians(q)))
+    end = (start[0]+r*cos(radians(q)), start[1]-r*sin(radians(q)))
     points.append(end)
     a = b
 
-  courses = unwrap_angles(courses)
-  offset = 4
-  bearing_delta = [b-a for a,b in zip(bearings[:-offset], bearings[offset:])] + [0]*(offset-1)
-  course_delta = [b-a for a,b in zip(courses[:-offset], courses[offset:])] + [0]*(offset-1)
+  courses = upwrap_angles(courses)
+  course_delta = calculate_delta(courses, 3)
   distance_y = [0]
-  for dist in distances[:-1]:
+  for dist in distances:
     last = distance_y[-1]
     distance_y.append(dist+last)
   distance_y = distance_y[1:]
@@ -92,22 +88,18 @@ def main():
   plt.figure(1)
   plt.subplot(411)
   x,y = zip(*points)
-  plt.plot(x,y,'bo-')
+  plt.plot(x,y,'-gD', markevery=[0])
 
   plt.subplot(412)
-  plt.plot(distance_y, bearing_delta, 'x-',
-           distance_y, course_delta, 'rx-')
+  plt.axhline()
+  plt.plot(distance_y[:-1], course_delta, 'x-')
 
   plt.subplot(413)
-  plt.plot(distances,'k',)
+  plt.plot(distance_y,speeds,'r',distance_y,distances,'k')
 
   plt.subplot(414)
-  plt.plot(distance_y, course_delta, 'b')
+  plt.plot(distance_y,courses)
   plt.show()
-
-
-
-
 
 
 if __name__ == '__main__':
