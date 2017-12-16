@@ -56,12 +56,13 @@ def main():
   distances = []
   bearings = []
   courses = []
+  course_delta_per_meter = []
   speeds = []
   points = [(0,0)]
   a = gps_msgs[0]
   for b in gps_msgs[1:]:
-    if (b.spd_over_grnd < 1):
-      continue
+    # if (b.spd_over_grnd < 1):
+    #   continue
 
     x = (a.latitude, a.longitude)
     y = (b.latitude, b.longitude)
@@ -72,13 +73,19 @@ def main():
     distances.append(r)
     bearings.append(r)
     courses.append(a.true_course)
+    delta = b.true_course - a.true_course
+    if (delta == 0 or r == 0):
+      course_delta_per_meter.append(0)
+    else:
+      course_delta_per_meter.append(delta / r)
+
     start = points[-1]
     end = (start[0]+r*cos(radians(q)), start[1]-r*sin(radians(q)))
     points.append(end)
     a = b
 
   courses = upwrap_angles(courses)
-  course_delta = calculate_delta(courses, 3)
+  course_delta = calculate_delta(courses, 1)
   distance_y = [0]
   for dist in distances:
     last = distance_y[-1]
@@ -86,18 +93,22 @@ def main():
   distance_y = distance_y[1:]
 
   plt.figure(1)
-  plt.subplot(411)
+  plt.subplot(511)
   x,y = zip(*points)
   plt.plot(x,y,'-gD', markevery=[0])
 
-  plt.subplot(412)
+  plt.subplot(512)
   plt.axhline()
-  plt.plot(distance_y[:-1], course_delta, 'x-')
+  plt.plot(distance_y[:-1], course_delta, 'r')
 
-  plt.subplot(413)
+  plt.subplot(513)
+  plt.axhline()
+  plt.plot(distance_y, course_delta_per_meter, 'b')
+
+  plt.subplot(514)
   plt.plot(distance_y,speeds,'r',distance_y,distances,'k')
 
-  plt.subplot(414)
+  plt.subplot(515)
   plt.plot(distance_y,courses)
   plt.show()
 

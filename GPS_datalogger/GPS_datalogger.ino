@@ -1,5 +1,5 @@
 // This code was written for use with feather m0 adalogger and feather gps for logging gps data to file
-     
+
 #include <Adafruit_GPS.h>
 #include <SPI.h>
 #include <SD.h>
@@ -9,10 +9,10 @@
 
 // Connect to the GPS on the hardware port
 Adafruit_GPS GPS(&GPSSerial);
-     
+
 // Set GPSECHO to 'false' to turn off echoing the GPS data to the Serial console
 // Set to 'true' if you want to debug and listen to the raw GPS sentences
-#define GPSECHO false
+#define GPSECHO true
 
 //uint32_t timer = millis();
 
@@ -20,6 +20,8 @@ Adafruit_GPS GPS(&GPSSerial);
 #define PMTK_Q_NAV_THRESHOLD "$PMTK447*35"
 #define PMTK_SET_NAV_SPEED_1MS "$PMTK386,1.0*3C"
 #define PMTK_SET_NAV_SPEED_2MS "$PMTK386,2.0*3F"
+#define PMTK_SET_BAUD_115200 "$PMTK251,115200*1F"
+#define PMTK_API_SET_FIX_CTL_10HZ "$PMTK300,100,0,0,0,0*2C"
 
 const int chipSelect = 4;
 bool fileOpen = false;
@@ -42,22 +44,21 @@ void setup()
 
   // Initialize GPS
   // 9600 NMEA is the default baud rate for Adafruit MTK GPS's- some use 4800
-  GPS.begin(57600);
+  GPS.begin(115200);
 
-  // set the baud rate at 57600
-//  GPS.sendCommand(PMTK_SET_BAUD_57600);
-//  GPS.begin(57600);
+  // set the baud rate at 115200
+//  GPS.sendCommand(PMTK_SET_BAUD_115200);
 
-  // increase the fix and output rate to 5Hz
-  GPS.sendCommand(PMTK_API_SET_FIX_CTL_5HZ);
-  GPS.sendCommand(PMTK_SET_NMEA_UPDATE_5HZ);
-  
+  // increase the fix and output rate to 10Hz
+  GPS.sendCommand(PMTK_API_SET_FIX_CTL_10HZ);
+  GPS.sendCommand(PMTK_SET_NMEA_UPDATE_10HZ);
+
   // RMC every fix, GGA every 5 fixes
 //  GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA5);
 
   // RMC only
   GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCONLY);
-     
+
   // Request updates on antenna status, comment out to keep quiet
   GPS.sendCommand(PGCMD_NOANTENNA);
 
@@ -92,13 +93,13 @@ void loop() // run over and over again
     // a tricky thing here is if we print the NMEA sentence, or data
     // we end up not listening and catching other sentences!
     // so be very wary if using OUTPUT_ALLDATA and trytng to print out data
-    
+
     GPS.parse(GPS.lastNMEA());
-    
+
     if (fileOpen) {
       dataFile.print(GPS.lastNMEA());
       dataFile.flush();
-//      Serial.print(GPS.lastNMEA());
+     // Serial.print(GPS.lastNMEA());
     }
   }
 
@@ -126,5 +127,5 @@ void loop() // run over and over again
 //  if (buttonState == SHORT_PRESS) {
 //    Serial.println("SHORT PRESS");
 //  }
-  
+
 }
