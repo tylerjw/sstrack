@@ -41,3 +41,40 @@ int handleButton(int pin)
 
   return ret;
 }
+
+short handleButtons(const short pins[], const short len)
+{
+  static long button_timer = 0;
+  static const long min_press_time = 25;
+  static boolean button_active = false;
+  static short prev_state = 0;
+
+  short current_state = 0;
+  for(short i = 0; i < len; i++) {
+    if (digitalRead(pins[i]) == LOW) {
+//      Serial.println(pins[i], DEC);
+      current_state |= (1 << i);
+    }
+  }
+
+  short ret = 0;
+
+  if(current_state != prev_state) {
+//    Serial.println(current_state, BIN);
+    // state change
+    if(current_state == 0) {
+      // no buttons pressed
+      if(millis() - button_timer > min_press_time) {
+        ret = prev_state;
+      }
+    } else {
+      // new button pressed
+      if (current_state != 0) {
+        button_timer = millis();
+      }
+    }
+  }
+
+  prev_state = current_state;
+  return ret;
+}
