@@ -8,15 +8,6 @@
 #include <SPI.h>
 #include <SD.h>
 
-#include <Adafruit_GFX.h>    // Core graphics library
-#include <Adafruit_ST7735.h> // Hardware-specific library
-
-#define TFT_CS     19
-#define TFT_RST    16  // you can also connect this to the Arduino reset
-                       // in which case, set this #define pin to -1!
-#define TFT_DC     17
-Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS,  TFT_DC, TFT_RST);
-
 // what's the name of the hardware serial port?
 #define GPSSerial Serial1
 
@@ -50,6 +41,7 @@ Adafruit_BNO055 bno = Adafruit_BNO055();
 adafruit_bno055_offsets_t CalData;
 
 const float p = 3.1415926;
+static double tripDistance = 0.0; // miles
 
 void setup()
 {
@@ -67,10 +59,7 @@ void setup()
   // set the baud rate at 115200
 //  gps.sendCommand(PMTK_SET_BAUD_115200);
 
-  // set gps to 1Hz mode and output rmc and gga
-  gps.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
-  gps.sendCommand(PMTK_API_SET_FIX_CTL_1HZ);
-  gps.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);
+  gpsScanMode();
 
   // RMC every fix, GGA every 5 fixes
   //gps.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA5);
@@ -110,8 +99,7 @@ void setup()
   }
 
   // Use this initializer if you're using a 1.8" TFT
-  tft.initR(INITR_BLACKTAB);   // initialize a ST7735S chip, black tab
-  tft.fillScreen(ST7735_BLACK);
+  initTft();
 }
 
 void loop() // run over and over again
@@ -155,13 +143,22 @@ void loop() // run over and over again
       dataFile.print(gyroLine);
       dataFile.print(eulerLine);
       dataFile.flush();
-    }
 
-    // cal LED
-    if (bno.isFullyCalibrated()) {
-      digitalWrite(calLed, HIGH);
+      // cal LED
+      if (bno.isFullyCalibrated()) {
+        digitalWrite(calLed, HIGH);
+      } else {
+        digitalWrite(calLed, LOW);
+      }
     } else {
-      digitalWrite(calLed, LOW);
+      drawStats(gps, bno);
+
+      // gps fix LED
+      if (gps.fix) {
+        digitalWrite(calLed, HIGH);
+      } else {
+        digitalWrite(calLed, LOW);
+      }
     }
   }
 
@@ -171,9 +168,10 @@ void loop() // run over and over again
     if (buttonState == 1) {
       if (fileOpen) {
         // change gps mode
-        gps.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCGGA);
-        gps.sendCommand(PMTK_API_SET_FIX_CTL_1HZ);
-        gps.sendCommand(PMTK_SET_NMEA_UPDATE_1HZ);
+        gpsScanMode();
+
+        // clear screen
+        clearScreen();
 
         // close the file
         dataFile.close();
@@ -182,9 +180,11 @@ void loop() // run over and over again
         fileOpen = false;
       } else {
         // change gps mode
-        gps.sendCommand(PMTK_SET_NMEA_OUTPUT_RMCONLY);
-        gps.sendCommand(PMTK_API_SET_FIX_CTL_10HZ);
-        gps.sendCommand(PMTK_SET_NMEA_UPDATE_10HZ);
+        gpsCaptureMode();
+
+        // clear screen
+        clearScreen();
+        drawRecordingMessage();
 
         // open the file
         String filename = nextFilename("/", "SST", "LOG");
@@ -199,6 +199,4 @@ void loop() // run over and over again
       LoadBNO055Calibration(bno);
     }
   }
-
-  drawStats(tft, gps);
 }
