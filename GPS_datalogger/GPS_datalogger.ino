@@ -106,8 +106,10 @@ void loop() // run over and over again
 {
   char datestamp[7];
   char timestamp[11];
-  char gyroLine[53];
-  char eulerLine[54];
+  char gyroLine[60];
+  char accelLine[60];
+  char linearLine[60];
+  char eulerLine[60];
 
   // read data from the gps in the 'main loop'
   char c = gps.read();
@@ -126,12 +128,17 @@ void loop() // run over and over again
     sprintf(timestamp, "%02d%02d%02d.%03d", gps.hour, gps.minute, gps.seconds, gps.milliseconds);
 
     imu::Vector<3> gyro = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
-    sprintf(gyroLine, "$GYRO,%s,%s,%+.3f,%+.3f,%+.3f\r\n", datestamp, timestamp, gyro.x(), gyro.y(), gyro.z());
+    sprintf(gyroLine, "$GYRO,%s,%s,%.3f,%.3f,%.3f\r\n", datestamp, timestamp, gyro.x(), gyro.y(), gyro.z());
+
+    imu::Vector<3> accel = bno.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
+    sprintf(accelLine, "$ACCEL,%s,%s,%.3f,%.3f,%.3f\r\n", datestamp, timestamp, accel.x(), accel.y(), accel.z());
+
+    imu::Vector<3> linear = bno.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
+    sprintf(linearLine, "$LINEAR,%s,%s,%.3f,%.3f,%.3f\r\n", datestamp, timestamp, linear.x(), linear.y(), linear.z());
 
     sensors_event_t event;
-    sprintf(timestamp, "%02d%02d%02d.%03d", gps.hour, gps.minute, gps.seconds, gps.milliseconds);
     bno.getEvent(&event);
-    sprintf(eulerLine, "$EULER,%s,%s,%+.3f,%+.3f,%+.3f\r\n", datestamp, timestamp, event.orientation.x, event.orientation.y, event.orientation.z);
+    sprintf(eulerLine, "$EULER,%s,%s,%.3f,%.3f,%.3f\r\n", datestamp, timestamp, event.orientation.x, event.orientation.y, event.orientation.z);
 
     // fix whitespace issue with how NMEA strings are stored
     String nmeaLine(gps.lastNMEA());
@@ -141,6 +148,8 @@ void loop() // run over and over again
     if (fileOpen) {
       dataFile.print(nmeaLine);
       dataFile.print(gyroLine);
+      dataFile.print(accelLine);
+      dataFile.print(linearLine);
       dataFile.print(eulerLine);
       dataFile.flush();
 
