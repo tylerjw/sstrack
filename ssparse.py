@@ -97,9 +97,6 @@ def to_text(note):
       text += 'Vlg'
     elif (note['distance'] > 50):
       text += 'lg'
-
-
-
   return text
 
 def upwrap_angles(angles, threshold=180):

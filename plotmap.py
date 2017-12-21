@@ -25,13 +25,12 @@ def haversine(point1, point2):
   a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
   c = 2 * math.asin(math.sqrt(a))
   # Radius of earth in kilometers is 6371
-  dist = 6371 * c
-  return dist
+  return 6371 * c
 
 def myround(x, base=5):
     return int(base * round(float(x)/base))
 
-def get_odo(rmc_msgs, odo_start):
+def get_odo_km(rmc_msgs, odo_start=0):
   odo = [odo_start]
   for a,b in zip(rmc_msgs[:-1], rmc_msgs[1:]):
     dist = haversine((a.latitude, a.longitude),
@@ -39,24 +38,42 @@ def get_odo(rmc_msgs, odo_start):
     odo.append(odo[-1] + dist)
   return odo
 
-def get_speed(rmc_msgs):
+def get_odo_m(rmc_msgs, odo_start):
+  odo = get_odo_km(rmc_msgs, odo_start)
+  odo = [x*1000 for x in odo]
+  return odo
+
+def get_speed_knots(rmc_msgs):
   speed = [p.spd_over_grnd for p in rmc_msgs]
   return speed
 
-def get_distances(rmc_msgs):
+def get_speed_mph(rmc_msgs):
+  speed = [p.spd_over_grnd*1.15078 for p in rmc_msgs]
+  return speed
+
+def get_speed_ms(rmc_msgs):
+  speed = [p.spd_over_grnd*0.5144447 for p in rmc_msgs]
+  return speed
+
+def get_distances_m(rmc_msgs):
   distances = [0]
   for a,b in zip(rmc_msgs[:-1], rmc_msgs[1:]):
     dist = haversine((a.latitude, a.longitude),
                      (b.latitude, b.longitude))
-    distances.append(dist)
+    distances.append(dist * 1000)
   return distances
 
-def get_courses(rmc_msgs):
+def get_courses_deg(rmc_msgs):
   courses = [p.true_course for p in rmc_msgs]
   return courses
 
+def get_courses_rad(rmc_msgs):
+  courses = get_courses_deg(rmc_msgs)
+  courses = [math.radians(c) for c in courses]
+  return courses
 
-def plot_map(title, rmc_msgs, odo_start=0, show_plot=True):
+
+def plot_map(title, rmc_msgs, odo_start=0, show_plot=True, note=None):
   times = []
   lats = []
   lons = []
@@ -65,7 +82,7 @@ def plot_map(title, rmc_msgs, odo_start=0, show_plot=True):
     lats.append(point.latitude)
     lons.append(point.longitude)
 
-  odo = get_odo(rmc_msgs, odo_start)
+  odo_km = get_odo_km(rmc_msgs, odo_start)
 
   start_lat = lats[0]
   stop_lat = lats[-1]
@@ -86,12 +103,16 @@ def plot_map(title, rmc_msgs, odo_start=0, show_plot=True):
   scale = haversine((center_lat, min(lons)), (center_lat, max(lons))) * 2 / 3
   scale_units = 'km'
   if (scale < 2):
-    scale = myround(scale*1000, 100)
+    scale = myround(scale*1000, 5)
     scale_units = 'm'
   else:
     scale = myround(scale, 2)
 
   padding = 0.3 * max((delta_lon,delta_lat))
+
+  print('scale: ', scale)
+  if scale == 0:
+    return
 
   ll_lon=(min(lons)-padding)
   ll_lat=(min(lats)-padding)
@@ -119,23 +140,30 @@ def plot_map(title, rmc_msgs, odo_start=0, show_plot=True):
   map.plot(x0, y0, 'bo', markersize=2)
   map.plot(x1, y1, 'k+', markersize=2)
 
-  start_label = 'START\n%s\n%s\n%.2fkm' % (start_lat, start_lon, odo[0])
-  stop_label  = 'END\n%s\n%s\n%.2fkm' % (stop_lat, stop_lon, odo[-1])
+  if note and note['type'] == 'corner':
+    apex_index = note['num']['apex_index']
+    apex_lon = lons[apex_index]
+    apex_lat = lats[apex_index]
+    x2, y2 = map(apex_lon, apex_lat)
+    map.plot(x2, y2, 'g*', markersize=2)
+    apex_text = 'numf: %.2f\nmpr: %.4f' % (note['num']['numf'], note['num']['mpr'])
+    plt.text(x2, y2, apex_text, fontsize=3)
 
-  plt.text(x0-350, y0, start_label, fontsize=3)
-  plt.text(x1+150, y1, stop_label, fontsize=3)
+  start_label = 'START\n%s\n%s\n%.2fkm' % (start_lat, start_lon, odo_km[0])
+  stop_label  = 'END\n%s\n%s\n%.2fkm' % (stop_lat, stop_lon, odo_km[-1])
+
+  plt.text(x0, y0, start_label, fontsize=3)
+  plt.text(x1, y1, stop_label, fontsize=3)
 
 
   map.drawmapscale(center_lon, min(lats)-(padding*0.5),
                    lons[0], lats[0], scale, barstyle='fancy', units=scale_units)
 
   plt.title(title)
+  plt.savefig('%s.png' % title, bbox_inches='tight', dpi=500)
   if show_plot:
     plt.show()
-
-  # save file
-  plt.plot()
-  plt.savefig('%s.png' % title, bbox_inches='tight', dpi=500)
+  plt.close('all')
 
 def main():
   usage = "usage: %prog [options] inputFile"
@@ -147,7 +175,7 @@ def main():
 
   messages = readlogfile(args[0])
 
-  plot_map(args[0].split('.')[0], messages['RMC'])
+  plot_map(args[0].split('.')[0], messages['RMC'], show_plot=False)
 
 
 if __name__ == '__main__':
