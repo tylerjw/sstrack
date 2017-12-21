@@ -2,7 +2,6 @@ import pynmea2
 from optparse import OptionParser
 from pprint import pprint
 import math
-import utm
 from mpl_toolkits.basemap import Basemap
 import matplotlib.pyplot as plt
 from readlogfile import readlogfile
@@ -14,7 +13,7 @@ def haversine(point1, point2):
   """
   Calculate the great circle distance between two points
   on the earth (specified in decimal degrees)
-  Returns distance in km
+  Returns distance in m
   """
   # convert decimal degrees to radians
   lat1, lon1 = point1
@@ -26,20 +25,38 @@ def haversine(point1, point2):
   a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
   c = 2 * math.asin(math.sqrt(a))
   # Radius of earth in kilometers is 6371
-  r = 6371 * c
-
-  # num = math.sin(dlon)*math.cos(lat2)
-  # denom = math.cos(lat1)*math.sin(lat2)-math.sin(lat1)*math.cos(lat2)*math.cos(dlon)
-  # q = math.atan2(num, denom)
-  # q = math.degrees(q)
-  # q = (q + 360) % 360
-
-  return r
+  dist = 6371 * c
+  return dist
 
 def myround(x, base=5):
     return int(base * round(float(x)/base))
 
-def plot_map(title, rmc_msgs):
+def get_odo(rmc_msgs, odo_start):
+  odo = [odo_start]
+  for a,b in zip(rmc_msgs[:-1], rmc_msgs[1:]):
+    dist = haversine((a.latitude, a.longitude),
+                     (b.latitude, b.longitude))
+    odo.append(odo[-1] + dist)
+  return odo
+
+def get_speed(rmc_msgs):
+  speed = [p.spd_over_grnd for p in rmc_msgs]
+  return speed
+
+def get_distances(rmc_msgs):
+  distances = [0]
+  for a,b in zip(rmc_msgs[:-1], rmc_msgs[1:]):
+    dist = haversine((a.latitude, a.longitude),
+                     (b.latitude, b.longitude))
+    distances.append(dist)
+  return distances
+
+def get_courses(rmc_msgs):
+  courses = [p.true_course for p in rmc_msgs]
+  return courses
+
+
+def plot_map(title, rmc_msgs, odo_start=0, show_plot=True):
   times = []
   lats = []
   lons = []
@@ -47,6 +64,8 @@ def plot_map(title, rmc_msgs):
     times.append(point.datetime)
     lats.append(point.latitude)
     lons.append(point.longitude)
+
+  odo = get_odo(rmc_msgs, odo_start)
 
   start_lat = lats[0]
   stop_lat = lats[-1]
@@ -72,8 +91,7 @@ def plot_map(title, rmc_msgs):
   else:
     scale = myround(scale, 2)
 
-  padding = 0.2 * max((delta_lon,delta_lat))
-
+  padding = 0.3 * max((delta_lon,delta_lat))
 
   ll_lon=(min(lons)-padding)
   ll_lat=(min(lats)-padding)
@@ -101,8 +119,8 @@ def plot_map(title, rmc_msgs):
   map.plot(x0, y0, 'bo', markersize=2)
   map.plot(x1, y1, 'k+', markersize=2)
 
-  start_label = 'START\n%s\n%s' % (start_lat, start_lon)
-  stop_label  = 'FINISH\n%s\n%s' % (stop_lat,  stop_lon)
+  start_label = 'START\n%s\n%s\n%.2fkm' % (start_lat, start_lon, odo[0])
+  stop_label  = 'END\n%s\n%s\n%.2fkm' % (stop_lat, stop_lon, odo[-1])
 
   plt.text(x0-350, y0, start_label, fontsize=3)
   plt.text(x1+150, y1, stop_label, fontsize=3)
@@ -112,8 +130,8 @@ def plot_map(title, rmc_msgs):
                    lons[0], lats[0], scale, barstyle='fancy', units=scale_units)
 
   plt.title(title)
-
-  plt.show()
+  if show_plot:
+    plt.show()
 
   # save file
   plt.plot()
